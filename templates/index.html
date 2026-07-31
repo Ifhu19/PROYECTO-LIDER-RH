@@ -202,21 +202,14 @@
                             <table class="table table-sm small mb-1"><thead><tr><th>Cant</th><th>Fecha</th><th></th></tr></thead><tbody>
                             {% for c in _comp %}
                             <tr><td>{{ c.cant }}h</td><td>{{ c.fecha }}</td>
-                                <td><form method="post" action="/del_comp" style="display:inline">
-                                    <input type="hidden" name="mes" value="{{ m }}">
-                                    <input type="hidden" name="usuario" value="{{ u }}">
-                                    <input type="hidden" name="idx" value="{{ loop.index0 }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0">X</button>
-                                </form></td></tr>
+                                <td><button type="button" class="btn btn-sm btn-outline-danger py-0" onclick="borrarComp('{{ m }}','{{ u }}',{{ loop.index0 }})">X</button></td></tr>
                             {% endfor %}
                             </tbody></table>
-                            <form method="post" action="/add_comp" class="row g-1">
-                                <input type="hidden" name="mes" value="{{ m }}">
-                                <input type="hidden" name="usuario" value="{{ u }}">
-                                <div class="col-auto"><input type="number" step="0.01" name="cant" placeholder="Horas" class="form-control form-control-sm" style="width:80px" required></div>
-                                <div class="col-auto"><input type="date" name="fecha" class="form-control form-control-sm" style="width:140px"></div>
-                                <div class="col-auto"><button type="submit" class="btn btn-sm btn-outline-primary">Agregar</button></div>
-                            </form>
+                            <div class="row g-1">
+                                <div class="col-auto"><input type="number" step="0.01" id="comp-cant-{{ i_mes }}-{{ i_u2 }}" placeholder="Horas" class="form-control form-control-sm" style="width:80px"></div>
+                                <div class="col-auto"><input type="date" id="comp-fecha-{{ i_mes }}-{{ i_u2 }}" class="form-control form-control-sm" style="width:140px"></div>
+                                <div class="col-auto"><button type="button" class="btn btn-sm btn-outline-primary" onclick="agregarComp({{ i_mes }},{{ i_u2 }},'{{ m }}','{{ u }}')">Agregar</button></div>
+                            </div>
                             <strong>Total compensado: {{ _comp|sum(attribute='cant')|round(2) }}h</strong>
                         </div>
                     </div>
@@ -362,6 +355,7 @@ function selMes(id, btn) {
     document.querySelectorAll('.btn-mes').forEach(function(b) { b.classList.remove('activo'); });
     document.getElementById(id).style.display = 'block';
     if (btn) btn.classList.add('activo');
+    try { localStorage.setItem('liderrh_mes', id); } catch(e) {}
 }
 function selUser(id, btn) {
     document.querySelectorAll('[id^="u-"]').forEach(function(e) { e.style.display = 'none'; });
@@ -369,6 +363,7 @@ function selUser(id, btn) {
     var el = document.getElementById(id);
     if (el) { el.style.display = 'block'; }
     if (btn) btn.classList.add('activo');
+    try { localStorage.setItem('liderrh_user', id); } catch(e) {}
 }
 function selDept(id, btn) {
     var el = document.getElementById(id);
@@ -394,18 +389,51 @@ function guardarHP(i_mes, i_u2, mes, usuario) {
     form.append('hp', hp);
     fetch('/hp', {method:'POST', body:form}).then(function() { location.reload(); });
 }
+function agregarComp(i_mes, i_u2, mes, usuario) {
+    var cant = document.getElementById('comp-cant-' + i_mes + '-' + i_u2).value;
+    var fecha = document.getElementById('comp-fecha-' + i_mes + '-' + i_u2).value;
+    if (!cant) { alert('Ingresa una cantidad de horas'); return; }
+    var form = new FormData();
+    form.append('mes', mes);
+    form.append('usuario', usuario);
+    form.append('cant', cant);
+    form.append('fecha', fecha);
+    fetch('/add_comp', {method:'POST', body:form}).then(function() { location.reload(); });
+}
+function borrarComp(mes, usuario, idx) {
+    var form = new FormData();
+    form.append('mes', mes);
+    form.append('usuario', usuario);
+    form.append('idx', idx);
+    fetch('/del_comp', {method:'POST', body:form}).then(function() { location.reload(); });
+}
 function toggleDet(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
-{% if info_idx_mes and info_idx_u %}
 window.addEventListener('DOMContentLoaded', function() {
-    var mBtn = document.querySelectorAll('.btn-mes')[{{ info_idx_mes - 1 }}];
-    if (mBtn) selMes('s-{{ info_idx_mes }}', mBtn);
-    var uBtn = document.querySelectorAll('#s-{{ info_idx_mes }} .btn-u')[{{ info_idx_u - 1 }}];
-    if (uBtn) selUser('u-{{ info_idx_mes }}-{{ info_idx_u }}', uBtn);
+    var mesSel = null, userSel = null;
+    {% if info_idx_mes and info_idx_u %}
+    mesSel = 's-{{ info_idx_mes }}';
+    userSel = 'u-{{ info_idx_mes }}-{{ info_idx_u }}';
+    {% else %}
+    try {
+        mesSel = localStorage.getItem('liderrh_mes');
+        userSel = localStorage.getItem('liderrh_user');
+    } catch(e) {}
+    {% endif %}
+    if (mesSel && document.getElementById(mesSel)) {
+        var mIdx = parseInt(mesSel.split('-')[1]);
+        var mBtn = document.querySelectorAll('.btn-mes')[mIdx - 1];
+        if (mBtn) selMes(mesSel, mBtn);
+        if (userSel && document.getElementById(userSel)) {
+            var uIdx = parseInt(userSel.split('-')[2]);
+            var uBtn = document.querySelectorAll('#' + mesSel + ' .btn-u')[uIdx - 1];
+            if (uBtn) selUser(userSel, uBtn);
+        }
+    }
 });
-{% endif %}
 </script>
 </body>
 </html>
+
