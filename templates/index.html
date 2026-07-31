@@ -191,16 +191,41 @@
                         <div class="rbox bg3" onclick="toggleDet('du-dep-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">Total depuradas</span>{{ st.dep_total }}</div>
                         <div id="du-dep-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">{% if st.dep_html %}Desglose depuradas:<br>{{ st.dep_html|safe }}{% else %}Sin datos de depuradas{% endif %}</div>
                         <div class="rbox {% if st.condicion_dep %}bg4{% else %}bg0{% endif %}" onclick="toggleDet('du-depr-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">Depuradas - Obligatorias</span>{{ st.dep_resta }}</div>
-                        <div id="du-depr-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">Dep - 176 - HP = {{ st.dep_total_h|round(2) }} - 176 - {{ st.get('hp', 0) }} = {{ (st.dep_total_h - 176 - st.get('hp', 0))|round(2) }}</div>
+                        <div id="du-depr-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">
+                            {% set _comp = st.get('compensadas', []) %}
+                            Dep - 176 - HP - Compensadas = {{ st.dep_total_h|round(2) }} - 176 - {{ st.get('hp', 0) }} - {{ _comp|sum(attribute='cant')|round(2) }} = {{ (st.dep_total_h - 176 - st.get('hp', 0) - _comp|sum(attribute='cant'))|round(2) }}
+                        </div>
                         <div class="rbox {% if st.condicion_dep %}bg5{% else %}bg0{% endif %}" onclick="toggleDet('du-pct-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">% Dep/176</span>{{ st.dep_pct }}</div>
                         <div id="du-pct-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">(Dep / 176) * 100 = ({{ st.dep_total_h|round(2) }} / 176) * 100 = {{ (st.dep_total_h / 176 * 100)|round(1) }}%</div>
+                        <div class="rbox {% if st.condicion_dep %}bg5{% else %}bg0{% endif %}" onclick="toggleDet('du-compensadas-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">Compensadas</span>{{ _comp|sum(attribute='cant')|round(2) }}h</div>
+                        <div id="du-compensadas-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">
+                            <table class="table table-sm small mb-1"><thead><tr><th>Cant</th><th>Fecha</th><th></th></tr></thead><tbody>
+                            {% for c in _comp %}
+                            <tr><td>{{ c.cant }}h</td><td>{{ c.fecha }}</td>
+                                <td><form method="post" action="/del_comp" style="display:inline">
+                                    <input type="hidden" name="mes" value="{{ m }}">
+                                    <input type="hidden" name="usuario" value="{{ u }}">
+                                    <input type="hidden" name="idx" value="{{ loop.index0 }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0">X</button>
+                                </form></td></tr>
+                            {% endfor %}
+                            </tbody></table>
+                            <form method="post" action="/add_comp" class="row g-1">
+                                <input type="hidden" name="mes" value="{{ m }}">
+                                <input type="hidden" name="usuario" value="{{ u }}">
+                                <div class="col-auto"><input type="number" step="0.01" name="cant" placeholder="Horas" class="form-control form-control-sm" style="width:80px" required></div>
+                                <div class="col-auto"><input type="date" name="fecha" class="form-control form-control-sm" style="width:140px"></div>
+                                <div class="col-auto"><button type="submit" class="btn btn-sm btn-outline-primary">Agregar</button></div>
+                            </form>
+                            <strong>Total compensado: {{ _comp|sum(attribute='cant')|round(2) }}h</strong>
+                        </div>
                     </div>
                     <hr class="mb-1">
                     <div class="d-flex align-items-center gap-2">
                         <span class="small">Horas pagadas:</span>
                         <input type="number" step="0.01" id="hp-{{ i_mes }}-{{ i_u2 }}" value="{{ st.get('hp', 0) }}" class="form-control form-control-sm" style="width:90px">
                         <button type="button" class="btn btn-sm btn-outline-success" onclick="guardarHP({{ i_mes }},{{ i_u2 }},'{{ m }}','{{ u }}')">Guardar</button>
-                        <small class="text-muted">Dep netas: {% set netas = st.dep_total_h - st.get('hp', 0) %}{{ netas|round(2) }}h</small>
+                        <small class="text-muted">Restante: {% set _comp2 = st.get('compensadas', []) %}{% set restante = st.dep_total_h - 176 - st.get('hp', 0) - _comp2|sum(attribute='cant') %}{{ restante|round(2) }}h</small>
                     </div>
                     {% endif %}
                 </div>
@@ -384,4 +409,3 @@ window.addEventListener('DOMContentLoaded', function() {
 </script>
 </body>
 </html>
-
