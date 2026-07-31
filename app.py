@@ -86,6 +86,7 @@ def analizar(df):
         "rows": len(df),
         "duplicadas": int(df.duplicated().sum()),
         "hp": 0,
+        "compensadas": [],  # lista de {"cant": float, "fecha": str}
     }
 
 @app.route("/reset/<mes>", methods=["POST"])
@@ -93,6 +94,18 @@ def reset_mes(mes):
     global almacen
     almacen = {k:v for k,v in almacen.items() if k[0] != mes}
     return redirect("/")
+
+def recalcular_dep_resta(e):
+    """Recalcula dep_resta segun hp y compensadas"""
+    total_comp = sum(c["cant"] for c in e.get("compensadas", []))
+    hp = e.get("hp", 0)
+    dep_r = e["dep_total_h"] - 176 - hp - total_comp
+    if dep_r > 0:
+        e["dep_resta"] = fmt_hours(pd.Timedelta(hours=dep_r))
+        e["dep_resta_h"] = dep_r
+    else:
+        e["dep_resta"] = "0h 00m"
+        e["dep_resta_h"] = 0
 
 @app.route("/hp", methods=["POST"])
 def set_hp():
@@ -102,16 +115,33 @@ def set_hp():
     except: hp = 0
     key = (mes, usuario)
     if key in almacen:
-        e = almacen[key]
-        e["hp"] = hp
-        # Recalcular dep_resta = max(0, dep_total_h - 176 - hp)
-        dep_r = e["dep_total_h"] - 176 - hp
-        if dep_r > 0:
-            e["dep_resta"] = fmt_hours(pd.Timedelta(hours=dep_r))
-            e["dep_resta_h"] = dep_r
-        else:
-            e["dep_resta"] = "0h 00m"
-            e["dep_resta_h"] = 0
+        almacen[key]["hp"] = hp
+        recalcular_dep_resta(almacen[key])
+    return redirect("/")
+
+@app.route("/add_comp", methods=["POST"])
+def add_comp():
+    mes = request.form.get("mes", "")
+    usuario = request.form.get("usuario", "")
+    try: cant = float(request.form.get("cant", 0))
+    except: cant = 0
+    fecha = request.form.get("fecha", "")
+    key = (mes, usuario)
+    if key in almacen and cant > 0:
+        almacen[key].setdefault("compensadas", []).append({"cant": cant, "fecha": fecha})
+        recalcular_dep_resta(almacen[key])
+    return redirect("/")
+
+@app.route("/del_comp", methods=["POST"])
+def del_comp():
+    mes = request.form.get("mes", "")
+    usuario = request.form.get("usuario", "")
+    try: idx = int(request.form.get("idx", -1))
+    except: idx = -1
+    key = (mes, usuario)
+    if key in almacen and 0 <= idx < len(almacen[key].get("compensadas", [])):
+        almacen[key]["compensadas"].pop(idx)
+        recalcular_dep_resta(almacen[key])
     return redirect("/")
 
 @app.route("/", methods=["GET", "POST"])
@@ -164,7 +194,8 @@ def index():
         sum_dep = sum(e["dep_total_h"] for e in entries)
         sum_dep_r = sum(e["dep_resta_h"] for e in entries)
         sum_hp = sum(e.get("hp", 0) for e in entries)
-        sum_dep_netas = sum_dep - sum_hp
+        sum_compensadas = sum(sum(c["cant"] for c in e.get("compensadas", [])) for e in entries)
+        sum_dep_netas = sum_dep - sum_hp - sum_compensadas
         num = len(entries)
         dep_pct_val = (sum_dep / (176 * num)) * 100 if sum_dep > 0 else 0
         totales_mes[m] = {
@@ -173,6 +204,7 @@ def index():
             "dep_total": fmt_hours(pd.Timedelta(hours=sum_dep)),
             "dep_netas": fmt_hours(pd.Timedelta(hours=sum_dep_netas)) if sum_dep_netas > 0 else "0h 00m",
             "dep_resta": fmt_hours(pd.Timedelta(hours=sum_dep_r)) if sum_dep_r > 0 else "0h 00m",
+            "total_compensado": sum_compensadas,
             "dep_pct": f"{dep_pct_val:.1f}%" if dep_pct_val > 0 else "0%",
             "usuarios_subidos": num,
             "condicion": sum_comp > 0,
@@ -184,7 +216,8 @@ def index():
     gt_comp = sum(t["comp_h"] for t in almacen.values())
     gt_dep = sum(t["dep_total_h"] for t in almacen.values())
     gt_hp = sum(t.get("hp", 0) for t in almacen.values())
-    gt_dep_netas = gt_dep - gt_hp
+    gt_compensadas = sum(sum(c["cant"] for c in t.get("compensadas", [])) for t in almacen.values())
+    gt_dep_netas = gt_dep - gt_hp - gt_compensadas
     gt_dep_r = sum(t["dep_resta_h"] for t in almacen.values())
     gt_pct = (gt_dep / (176 * len(almacen))) * 100 if gt_dep > 0 and almacen else 0
 
@@ -196,9 +229,10 @@ def index():
             sum_h = sum(e["total_h"] for e in u_entries)
             sum_dep = sum(e["dep_total_h"] for e in u_entries)
             sum_hp = sum(e.get("hp", 0) for e in u_entries)
+            sum_compensadas = sum(sum(c["cant"] for c in e.get("compensadas", [])) for e in u_entries)
             totales_usuario[u] = {"total": fmt_hours(pd.Timedelta(hours=sum_h)), "total_h": sum_h,
                                   "dep_total": fmt_hours(pd.Timedelta(hours=sum_dep)),
-                                  "dep_netas": fmt_hours(pd.Timedelta(hours=sum_dep - sum_hp))}
+                                  "dep_netas": fmt_hours(pd.Timedelta(hours=sum_dep - sum_hp - sum_compensadas))}
 
     return render_template("index.html", meses=MESES, usuarios=USUARIOS, almacen=almacen, totales_mes=totales_mes,
                            totales_usuario=totales_usuario,
@@ -218,4 +252,3 @@ if __name__ == "__main__":
     print(f"\nLocal:  http://localhost:{port}")
     print(f"Red:    http://{ip}:{port}\n")
     app.run(debug=True, port=port, host="0.0.0.0")
-
