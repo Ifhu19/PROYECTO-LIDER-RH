@@ -102,7 +102,16 @@ def set_hp():
     except: hp = 0
     key = (mes, usuario)
     if key in almacen:
-        almacen[key]["hp"] = hp
+        e = almacen[key]
+        e["hp"] = hp
+        # Recalcular dep_resta = max(0, dep_total_h - 176 - hp)
+        dep_r = e["dep_total_h"] - 176 - hp
+        if dep_r > 0:
+            e["dep_resta"] = fmt_hours(pd.Timedelta(hours=dep_r))
+            e["dep_resta_h"] = dep_r
+        else:
+            e["dep_resta"] = "0h 00m"
+            e["dep_resta_h"] = 0
     return redirect("/")
 
 @app.route("/", methods=["GET", "POST"])
