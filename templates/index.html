@@ -57,44 +57,47 @@
         <div class="card">
             <div class="card-body">
                 <h5 class="text-center">RESUMEN GENERAL</h5>
-                <table class="table table-sm table-bordered table-striped">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Mes</th>
-                            <th>Total horas</th>
-                            <th>Compensatorias</th>
-                            <th>Total depuradas</th>
-                            <th>Depuradas - Obligatorias</th>
-                            <th>% Dep/176</th>
-                            <th>Usuarios</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for m in meses %}
-                        {% set dt = totales_mes.get(m) %}
-                        <tr>
-                            <td>{{ m }}</td>
-                            <td>{{ dt.total if dt else "—" }}</td>
-                            <td>{{ dt.comp if dt else "—" }}</td>
-                            <td>{{ dt.dep_total if dt else "—" }}</td>
-                            <td>{{ dt.dep_resta if dt else "—" }}</td>
-                            <td>{{ dt.dep_pct if dt else "—" }}</td>
-                            <td>{{ dt.usuarios_subidos if dt else "—" }}{% if dt and dt.usuarios_subidos %}/8{% endif %}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                    <tfoot class="table-secondary fw-bold">
-                        <tr>
-                            <td>TOTAL</td>
-                            <td>{{ gt.total }}</td>
-                            <td>{{ gt.comp }}</td>
-                            <td>{{ gt.dep }}</td>
-                            <td>{{ gt.dep_r }}</td>
-                            <td>{{ gt.pct }}</td>
-                            <td>{{ almacen|length }}</td>
-                        </tr>
-                    </tfoot>
-                </table>
+                    <table class="table table-sm table-bordered table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Mes</th>
+                                <th>Total horas</th>
+                                <th>Compensatorias</th>
+                                <th>Total depuradas</th>
+                                <th>Depuradas Netas</th>
+                                <th>Depuradas - Obligatorias</th>
+                                <th>% Dep/176</th>
+                                <th>Usuarios</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in meses %}
+                            {% set dt = totales_mes.get(m) %}
+                            <tr>
+                                <td>{{ m }}</td>
+                                <td>{{ dt.total if dt else "—" }}</td>
+                                <td>{{ dt.comp if dt else "—" }}</td>
+                                <td>{{ dt.dep_total if dt else "—" }}</td>
+                                <td>{{ dt.dep_netas if dt else "—" }}</td>
+                                <td>{{ dt.dep_resta if dt else "—" }}</td>
+                                <td>{{ dt.dep_pct if dt else "—" }}</td>
+                                <td>{{ dt.usuarios_subidos if dt else "—" }}{% if dt and dt.usuarios_subidos %}/8{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-secondary fw-bold">
+                            <tr>
+                                <td>TOTAL</td>
+                                <td>{{ gt.total }}</td>
+                                <td>{{ gt.comp }}</td>
+                                <td>{{ gt.dep }}</td>
+                                <td>{{ gt.dep_netas }}</td>
+                                <td>{{ gt.dep_r }}</td>
+                                <td>{{ gt.pct }}</td>
+                                <td>{{ almacen|length }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
             </div>
         </div>
     </div>
@@ -177,8 +180,30 @@
                             <button type="button" class="btn btn-sm btn-outline-primary" onclick="this.previousElementSibling.click()">Subir archivo</button>
                         </div>
                     </div>
-                    {% if almacen.get((m, u)) %}
-                    <hr><small class="text-success">Archivo subido</small>
+                    {% set st = almacen.get((m, u)) %}
+                    {% if st %}
+                    <hr>
+                    <div class="text-center">
+                        <div class="rbox bg1" onclick="toggleDet('du-tot-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">Total horas</span>{{ st.total }}</div>
+                        <div id="du-tot-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">{% if st.total_html %}Desglose total:<br>{{ st.total_html|safe }}{% else %}Sin datos{% endif %}</div>
+                        <div class="rbox {% if st.condicion %}bg2{% else %}bg0{% endif %}" onclick="toggleDet('du-comp-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">Compensatorias</span>{{ st.comp }}</div>
+                        <div id="du-comp-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">Total - 176 = {% if st.total_h %}{{ st.total_h|round(2) }} - 176 = {{ (st.total_h - 176)|round(2) }}{% endif %}</div>
+                        <div class="rbox bg3" onclick="toggleDet('du-dep-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">Total depuradas</span>{{ st.dep_total }}</div>
+                        <div id="du-dep-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">{% if st.dep_html %}Desglose depuradas:<br>{{ st.dep_html|safe }}{% else %}Sin datos de depuradas{% endif %}</div>
+                        <div class="rbox {% if st.condicion_dep %}bg4{% else %}bg0{% endif %}" onclick="toggleDet('du-depr-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">Depuradas - Obligatorias</span>{{ st.dep_resta }}</div>
+                        <div id="du-depr-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">Dep - 176 = {{ st.dep_total_h|round(2) }} - 176 = {{ (st.dep_total_h - 176)|round(2) }}</div>
+                        <div class="rbox {% if st.condicion_dep %}bg5{% else %}bg0{% endif %}" onclick="toggleDet('du-pct-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">% Dep/176</span>{{ st.dep_pct }}</div>
+                        <div id="du-pct-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">(Dep / 176) * 100 = ({{ st.dep_total_h|round(2) }} / 176) * 100 = {{ (st.dep_total_h / 176 * 100)|round(1) }}%</div>
+                    </div>
+                    <hr>
+                    <form method="post" action="/hp" class="row g-1 align-items-center">
+                        <input type="hidden" name="mes" value="{{ m }}">
+                        <input type="hidden" name="usuario" value="{{ u }}">
+                        <div class="col-auto"><label class="col-form-label small">Horas pagadas:</label></div>
+                        <div class="col-auto"><input type="number" step="0.01" name="hp" value="{{ st.get('hp', 0) }}" class="form-control form-control-sm" style="width:90px"></div>
+                        <div class="col-auto"><button type="submit" class="btn btn-sm btn-outline-success">Guardar</button></div>
+                        <div class="col-auto"><small class="text-muted">Dep netas: {% set netas = st.dep_total_h - st.get('hp', 0) %}{{ netas|round(2) }}h</small></div>
+                    </form>
                     {% endif %}
                 </div>
             </form>
@@ -211,6 +236,7 @@
                                         <th>Total horas</th>
                                         <th>Compensatorias</th>
                                         <th>Total depuradas</th>
+                                        <th>Depuradas Netas</th>
                                         <th>Depuradas - Obligatorias</th>
                                         <th>% Dep/176</th>
                                     </tr>
@@ -219,11 +245,13 @@
                                     {% for u in usuarios %}
                                     {% set st = almacen.get((m, u)) %}
                                     {% if st %}
+                                    {% set netas = st.dep_total_h - st.get('hp', 0) %}
                                     <tr>
                                         <td>{{ u }}</td>
                                         <td>{{ st.total }}</td>
                                         <td>{{ st.comp }}</td>
                                         <td>{{ st.dep_total }}</td>
+                                        <td>{{ netas|round(2) }}h</td>
                                         <td>{{ st.dep_resta }}</td>
                                         <td>{{ st.dep_pct }}</td>
                                     </tr>
@@ -236,6 +264,7 @@
                                         <td>{{ dt.total }}</td>
                                         <td>{{ dt.comp }}</td>
                                         <td>{{ dt.dep_total }}</td>
+                                        <td>{{ dt.dep_netas }}</td>
                                         <td>{{ dt.dep_resta }}</td>
                                         <td>{{ dt.dep_pct }}</td>
                                     </tr>
@@ -260,6 +289,7 @@
                                 <th>Total horas</th>
                                 <th>Compensatorias</th>
                                 <th>Total depuradas</th>
+                                <th>Depuradas Netas</th>
                                 <th>Depuradas - Obligatorias</th>
                                 <th>% Dep/176</th>
                             </tr>
@@ -268,11 +298,13 @@
                             {% for u in usuarios %}
                             {% set st = almacen.get((m, u)) %}
                             {% if st %}
+                            {% set netas = st.dep_total_h - st.get('hp', 0) %}
                             <tr>
                                 <td>{{ u }}</td>
                                 <td>{{ st.total }}</td>
                                 <td>{{ st.comp }}</td>
                                 <td>{{ st.dep_total }}</td>
+                                <td>{{ netas|round(2) }}h</td>
                                 <td>{{ st.dep_resta }}</td>
                                 <td>{{ st.dep_pct }}</td>
                             </tr>
@@ -287,6 +319,7 @@
                                 <td>{{ dt.total }}</td>
                                 <td>{{ dt.comp }}</td>
                                 <td>{{ dt.dep_total }}</td>
+                                <td>{{ dt.dep_netas }}</td>
                                 <td>{{ dt.dep_resta }}</td>
                                 <td>{{ dt.dep_pct }}</td>
                             </tr>
