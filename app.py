@@ -55,6 +55,13 @@ def guardar_almacen():
 
 almacen = cargar_almacen()  # (mes, usuario) -> info_dict
 
+@app.before_request
+def recargar_almacen():
+    """Recarga desde disco en cada peticion para que todos los workers de
+    gunicorn vean los cambios guardados por cualquier otro worker."""
+    global almacen
+    almacen = cargar_almacen()
+
 def detect_sep(file_bytes):
     sample = file_bytes[:4096].decode("utf-8-sig", errors="ignore")
     return ";" if sample.count(";") > sample.count(",") else ","
@@ -137,7 +144,6 @@ def analizar(df):
 @app.route("/reset/<mes>", methods=["POST"])
 def reset_mes(mes):
     global almacen
-    almacen = cargar_almacen()
     almacen = {k:v for k,v in almacen.items() if k[0] != mes}
     guardar_almacen()
     return redirect("/")
@@ -156,12 +162,10 @@ def recalcular_dep_resta(e):
 
 @app.route("/hp", methods=["POST"])
 def set_hp():
-    global almacen
     mes = request.form.get("mes", "")
     usuario = request.form.get("usuario", "")
     try: hp = float(request.form.get("hp", 0))
     except: hp = 0
-    almacen = cargar_almacen()
     key = (mes, usuario)
     if key in almacen:
         almacen[key]["hp"] = hp
@@ -171,13 +175,11 @@ def set_hp():
 
 @app.route("/add_comp", methods=["POST"])
 def add_comp():
-    global almacen
     mes = request.form.get("mes", "")
     usuario = request.form.get("usuario", "")
     try: cant = float(request.form.get("cant", 0))
     except: cant = 0
     fecha = request.form.get("fecha", "")
-    almacen = cargar_almacen()
     key = (mes, usuario)
     if key in almacen and cant > 0:
         almacen[key].setdefault("compensadas", []).append({"cant": cant, "fecha": fecha})
@@ -187,12 +189,10 @@ def add_comp():
 
 @app.route("/del_comp", methods=["POST"])
 def del_comp():
-    global almacen
     mes = request.form.get("mes", "")
     usuario = request.form.get("usuario", "")
     try: idx = int(request.form.get("idx", -1))
     except: idx = -1
-    almacen = cargar_almacen()
     key = (mes, usuario)
     if key in almacen and 0 <= idx < len(almacen[key].get("compensadas", [])):
         almacen[key]["compensadas"].pop(idx)
@@ -202,8 +202,6 @@ def del_comp():
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global almacen
-    almacen = cargar_almacen()
     info = None
     error = None
 
