@@ -218,4 +218,3 @@ if __name__ == "__main__":
     print(f"\nLocal:  http://localhost:{port}")
     print(f"Red:    http://{ip}:{port}\n")
     app.run(debug=True, port=port, host="0.0.0.0")
-
