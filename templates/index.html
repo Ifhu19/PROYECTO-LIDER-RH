@@ -195,15 +195,13 @@
                         <div class="rbox {% if st.condicion_dep %}bg5{% else %}bg0{% endif %}" onclick="toggleDet('du-pct-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">% Dep/176</span>{{ st.dep_pct }}</div>
                         <div id="du-pct-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">(Dep / 176) * 100 = ({{ st.dep_total_h|round(2) }} / 176) * 100 = {{ (st.dep_total_h / 176 * 100)|round(1) }}%</div>
                     </div>
-                    <hr>
-                    <form method="post" action="/hp" class="row g-1 align-items-center">
-                        <input type="hidden" name="mes" value="{{ m }}">
-                        <input type="hidden" name="usuario" value="{{ u }}">
-                        <div class="col-auto"><label class="col-form-label small">Horas pagadas:</label></div>
-                        <div class="col-auto"><input type="number" step="0.01" name="hp" value="{{ st.get('hp', 0) }}" class="form-control form-control-sm" style="width:90px"></div>
-                        <div class="col-auto"><button type="submit" class="btn btn-sm btn-outline-success">Guardar</button></div>
-                        <div class="col-auto"><small class="text-muted">Dep netas: {% set netas = st.dep_total_h - st.get('hp', 0) %}{{ netas|round(2) }}h</small></div>
-                    </form>
+                    <hr class="mb-1">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="small">Horas pagadas:</span>
+                        <input type="number" step="0.01" id="hp-{{ i_mes }}-{{ i_u2 }}" value="{{ st.get('hp', 0) }}" class="form-control form-control-sm" style="width:90px">
+                        <button class="btn btn-sm btn-outline-success" onclick="guardarHP({{ i_mes }},{{ i_u2 }},'{{ m }}','{{ u }}')">Guardar</button>
+                        <small class="text-muted">Dep netas: {% set netas = st.dep_total_h - st.get('hp', 0) %}{{ netas|round(2) }}h</small>
+                    </div>
                     {% endif %}
                 </div>
             </form>
@@ -362,6 +360,14 @@ function toggleRes() {
 function toggleResUser() {
     var el = document.getElementById('resumen-user');
     if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function guardarHP(i_mes, i_u2, mes, usuario) {
+    var hp = document.getElementById('hp-' + i_mes + '-' + i_u2).value;
+    var form = new FormData();
+    form.append('mes', mes);
+    form.append('usuario', usuario);
+    form.append('hp', hp);
+    fetch('/hp', {method:'POST', body:form}).then(function() { location.reload(); });
 }
 function toggleDet(id) {
     var el = document.getElementById(id);
