@@ -2,13 +2,58 @@ import pandas as pd
 import os
 import io
 import re
+import json
+import tempfile
+import threading
 from flask import Flask, redirect, render_template, request
 
 app = Flask(__name__)
 
 USUARIOS = ["Debbie Velazquez","Deyron Garcia","Luis Sierra","Jennifer Salgado","Daniel Salinas","Norwin Gonzalez","Isaac Zelaya","Cesar Flores"]
-almacen = {}  # (mes, usuario) -> info_dict
 MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+
+# --- Persistencia en disco -------------------------------------------------
+# almacen vivia solo en memoria RAM: si el servidor corre con varios workers
+# (p.ej. gunicorn) o se reinicia, los datos guardados con /hp, /add_comp,
+# /del_comp, etc. desaparecen sin aviso. Ahora se guarda en un archivo JSON
+# compartido en disco despues de cada cambio, y se recarga al iniciar.
+ALMACEN_FILE = os.environ.get("ALMACEN_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "almacen.json"))
+_lock = threading.Lock()
+
+def _key_to_str(k):
+    return f"{k[0]}||{k[1]}"
+
+def _str_to_key(s):
+    mes, usuario = s.split("||", 1)
+    return (mes, usuario)
+
+def cargar_almacen():
+    if not os.path.exists(ALMACEN_FILE):
+        return {}
+    try:
+        with open(ALMACEN_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return {_str_to_key(k): v for k, v in raw.items()}
+    except Exception:
+        return {}
+
+def guardar_almacen():
+    """Escritura atomica: escribe a un archivo temporal y luego renombra,
+    para evitar dejar el archivo corrupto si dos procesos escriben a la vez."""
+    with _lock:
+        raw = {_key_to_str(k): v for k, v in almacen.items()}
+        dir_ = os.path.dirname(ALMACEN_FILE) or "."
+        fd, tmp_path = tempfile.mkstemp(dir=dir_, prefix=".almacen_", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(raw, f, ensure_ascii=False)
+            os.replace(tmp_path, ALMACEN_FILE)
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
+
+almacen = cargar_almacen()  # (mes, usuario) -> info_dict
 
 def detect_sep(file_bytes):
     sample = file_bytes[:4096].decode("utf-8-sig", errors="ignore")
@@ -93,6 +138,7 @@ def analizar(df):
 def reset_mes(mes):
     global almacen
     almacen = {k:v for k,v in almacen.items() if k[0] != mes}
+    guardar_almacen()
     return redirect("/")
 
 def recalcular_dep_resta(e):
@@ -117,6 +163,7 @@ def set_hp():
     if key in almacen:
         almacen[key]["hp"] = hp
         recalcular_dep_resta(almacen[key])
+        guardar_almacen()
     return redirect("/")
 
 @app.route("/add_comp", methods=["POST"])
@@ -130,6 +177,7 @@ def add_comp():
     if key in almacen and cant > 0:
         almacen[key].setdefault("compensadas", []).append({"cant": cant, "fecha": fecha})
         recalcular_dep_resta(almacen[key])
+        guardar_almacen()
     return redirect("/")
 
 @app.route("/del_comp", methods=["POST"])
@@ -142,6 +190,7 @@ def del_comp():
     if key in almacen and 0 <= idx < len(almacen[key].get("compensadas", [])):
         almacen[key]["compensadas"].pop(idx)
         recalcular_dep_resta(almacen[key])
+        guardar_almacen()
     return redirect("/")
 
 @app.route("/", methods=["GET", "POST"])
@@ -179,6 +228,7 @@ def index():
                     error = f"No se encontraron registros de {usuario} en {mes_texto}"
                 else:
                     almacen[(mes_texto, usuario)] = info
+                    guardar_almacen()
 
     info_idx_mes = MESES.index(info["mes"]) + 1 if info and info["mes"] in MESES else None
     info_idx_u = USUARIOS.index(info["nombre"]) + 1 if info and info["nombre"] in USUARIOS else None
