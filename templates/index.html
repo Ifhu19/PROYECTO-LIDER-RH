@@ -191,7 +191,7 @@
                         <div class="rbox bg3" onclick="toggleDet('du-dep-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">Total depuradas</span>{{ st.dep_total }}</div>
                         <div id="du-dep-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">{% if st.dep_html %}Desglose depuradas:<br>{{ st.dep_html|safe }}{% else %}Sin datos de depuradas{% endif %}</div>
                         <div class="rbox {% if st.condicion_dep %}bg4{% else %}bg0{% endif %}" onclick="toggleDet('du-depr-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">Depuradas - Obligatorias</span>{{ st.dep_resta }}</div>
-                        <div id="du-depr-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">Dep - 176 = {{ st.dep_total_h|round(2) }} - 176 = {{ (st.dep_total_h - 176)|round(2) }}</div>
+                        <div id="du-depr-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">Dep - 176 - HP = {{ st.dep_total_h|round(2) }} - 176 - {{ st.get('hp', 0) }} = {{ (st.dep_total_h - 176 - st.get('hp', 0))|round(2) }}</div>
                         <div class="rbox {% if st.condicion_dep %}bg5{% else %}bg0{% endif %}" onclick="toggleDet('du-pct-{{ i_mes }}-{{ i_u2 }}')"><span class="lbl">% Dep/176</span>{{ st.dep_pct }}</div>
                         <div id="du-pct-{{ i_mes }}-{{ i_u2 }}" class="detalle small mt-1">(Dep / 176) * 100 = ({{ st.dep_total_h|round(2) }} / 176) * 100 = {{ (st.dep_total_h / 176 * 100)|round(1) }}%</div>
                     </div>
